@@ -1,0 +1,236 @@
+---
+title: "Practical Machine Learning Project - Human Activity Recognition"
+output: html_document
+author: Julio Cesano
+---
+## Write Up ##
+####Executive Summary####
+This detailed analysis has been performed to fulfill the requirements of WriteUp and Submission project of the Practical Machine Learning course offered by the Johns Hopkins University on Coursera.
+
+We will analyze and and explore a data set related to exercise activity obtained from: http://groupware.les.inf.puc-rio.br/har in order to build a model to predict the how well activity will be.
+We used two files; a training set and testing set in to built and test a predicting model. Two models were developed during this project and the best was selected using the testing set to measure and compare the performance of each model.
+
+**Goal**
+The main objective is to predict the manner the exercise which were done according to selected model. This means to use the "classe" variable in the training set. Any of the other variables can be use to predict with. A report must be created describing how model was built, how used cross validation was used, and an opinion about the expected out of sample error is, and an explaination about the choices made. The prediction model will also be used to predict 20 different test cases. 
+
+**Key results**
+We built and compared two models using tree and random forest algorithms. 
+The best model was the one with random forest.
+
+#### Preparing the environment ####
+In order to reproduce the same results, you need a certain set of packages, as well as setting a pseudo random seed equal to the one I used. 
+*Note:To install, for instance, the caret package in R, run this command: install.packages(“caret”)
+```{r}
+library(caret)
+library(lattice)
+library(ggplot2)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+```
+
+Finally we set a seed in order to get the same result in succesive runnings
+```{r}
+# setting the overall seed for reproduceability
+set.seed(1234)
+```
+
+####Loading Training and Testing Data ####
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+First of all, we load the training and testing data set into R.
+There are different ways of loading informatión depending if the intention is just to store the data set in memory from internet or if you already have the files in you computer.
+
+```{r}
+# Getting the information from a url and storing directly in memory
+# Some missing values are coded as string "#DIV/0!" or "" or "NA" - these will be changed to NA.
+# We notice that both data sets contain columns with all missing values - these will be deleted.
+
+trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+trainingset <- read.csv(url(trainUrl), na.strings=c("NA","#DIV/0!",""))
+
+# If you already have the csv file in your computer
+testingset <- read.csv('pml-testing.csv', na.strings=c("NA","#DIV/0!", ""))
+```
+
+####Processing Training and Testing Data ####
+
+Irrelevant variables will be deleted.
+Results will be hidden from the report for clarity and space considerations.
+
+Columns with all missing values were deleted
+
+```{r, echo=FALSE}
+trainingset<-trainingset[,colSums(is.na(trainingset)) == 0]
+testingset <-testingset[,colSums(is.na(testingset)) == 0]
+```
+
+Some variables are irrelevant to our current project: user_name, raw_timestamp_part_1, raw_timestamp_part_,2 cvtd_timestamp, new_window, and  num_window (columns 1 to 7). We can delete these variables.
+
+```{r}
+trainingset   <-trainingset[,-c(1:7)]
+testingset <-testingset[,-c(1:7)]
+```
+
+#### Partitioning the training data set to allow cross-validation ####
+
+In order to perform cross-validation, the training data set is partionned into 2 sets: subTraining (75%) and subTest (25%).
+This will be performed using random subsampling without replacement.
+
+```{r}
+subsamples <- createDataPartition(y=trainingset$classe, p=0.75, list=FALSE)
+subTraining <- trainingset[subsamples, ] 
+subTesting <- trainingset[-subsamples, ]
+
+```
+
+
+**Exploring the SubTraining set**
+
+```{r}
+plot(subTraining$classe, col="red", main="Bar Plot of levels of the variable classe within the subTraining data set", xlab="classe levels", ylab="Frequency")
+```
+
+From the graph above, we can see that each level frequency is within the same order of magnitude of each other. Level A is the most frequent with more than 4000 occurrences while level D is the least frequent with about 2500 occurrences.
+
+#### Creating Models #### 
+** First Model: Decision Tree **
+
+
+```{r}
+treeModel <- rpart(classe ~ ., data=subTraining, method="class")
+predictionTree <- predict(treeModel, subTesting, type = "class")
+rpart.plot(treeModel, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+```
+
+Now we test results on our subTesting data set:
+
+```{r}
+confusionMatrix(predictionTree, subTesting$classe)
+```
+
+** Second Model: Randomision Forest **
+
+```{r}
+randForestModel <- randomForest(classe ~. , data=subTraining, method="class")
+predictionRandForest <- predict(randForestModel, subTesting, type = "class")
+confusionMatrix(predictionRandForest, subTesting$classe)
+```
+
+** Conclusion **
+
+Random Forest algorithm performed better than Decision Trees.
+Accuracy for Random Forest model was 0.995 (95% CI: (0.993, 0.997)) compared to 0.739 (95% CI: (0.727, 0.752)) for Decision Tree model. The random Forest model is choosen. The accuracy of the model is 0.995. The expected out-of-sample error is estimated at 0.005, or 0.5%. The expected out-of-sample error is calculated as 1 - accuracy for predictions made against the cross-validation set. Our Test data set comprises 20 cases. With an accuracy above 99% on our cross-validation data, we can expect that very few, or none, of the test samples will be missclassified.
+
+## Submission ##
+
+Predict outcome levels on the original Testing data set using Random Forest algorithm
+
+```{r}
+predictfinal <- predict(randForestModel, testingset, type="class")
+predictfinal
+```
+
+
+** Making predictions with selected model **
+
+```{r}
+# Writing files for submission
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(predictfinal)
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
